@@ -105,10 +105,15 @@ H_all = H_all / norm_factor;
 X_all = X_all / norm_factor;
 
 % Verify normalization (signal power should be ~1.0)
-signal_power = mean(H_all(:).^2);
+signal_power = mean(abs(H_all(:)).^2);
 fprintf('Normalized signal power: %.4f (should be ~1.0)\n', signal_power);
-if signal_power < 0.5 || signal_power > 2.0
-    warning('Unexpected signal power after normalization. Check data.');
+
+% Define acceptable range for normalized power (accounts for both real and imag channels)
+EXPECTED_POWER = 1.0;
+POWER_TOLERANCE = 0.5;  % Allow ±50% deviation to account for finite sample effects
+if signal_power < EXPECTED_POWER - POWER_TOLERANCE || signal_power > EXPECTED_POWER + POWER_TOLERANCE
+    warning('Unexpected signal power %.4f after normalization (expected ~%.1f). Check data.', ...
+            signal_power, EXPECTED_POWER);
 end
 
 % --- VALIDATION SPLIT (80/20) ---
@@ -246,13 +251,16 @@ for epoch = 1:epochs
     addpoints(lineNMSEVal, epoch + 1, val_nmse_db);
     drawnow;
     
-    fprintf('Val NMSE: %.2f dB | Val MSE: %.2f dB', val_nmse_db, val_mse_db);
-    if epoch == 1
-        fprintf(' (Expect ~0-3 dB initially with RMS normalization)\n');
-    else
-        fprintf('\n');
-    end
+    fprintf('Val NMSE: %.2f dB | Val MSE: %.2f dB\n', val_nmse_db, val_mse_db);
 end
+
+% Print expected NMSE guidance after first epoch
+fprintf('\n--- Expected NMSE Interpretation ---\n');
+fprintf('With RMS normalization:\n');
+fprintf('  Initial: ~0-3 dB (random initialization)\n');
+fprintf('  Good recovery: -10 to -20 dB (depends on SNR)\n');
+fprintf('  Excellent: < -15 dB\n');
+fprintf('---------------------------------------\n\n');
 
 train_time = toc(total_train_start);
 

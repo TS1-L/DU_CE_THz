@@ -254,14 +254,6 @@ for epoch = 1:epochs
     fprintf('Val NMSE: %.2f dB | Val MSE: %.2f dB\n', val_nmse_db, val_mse_db);
 end
 
-% Print expected NMSE guidance after first epoch
-fprintf('\n--- Expected NMSE Interpretation ---\n');
-fprintf('With RMS normalization:\n');
-fprintf('  Initial: ~0-3 dB (random initialization)\n');
-fprintf('  Good recovery: -10 to -20 dB (depends on SNR)\n');
-fprintf('  Excellent: < -15 dB\n');
-fprintf('---------------------------------------\n\n');
-
 train_time = toc(total_train_start);
 
 model_name = 'trained_LAMP_model.mat';

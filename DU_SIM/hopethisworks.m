@@ -97,10 +97,24 @@ H_all = cat(4, Y_list{:});
 X_all = cat(4, X_list{:});
 
 % --- NORMALIZE ---
-norm_factor = max(abs(H_all), [], 'all');
-fprintf('Data Max: %.2e. Normalizing...\n', norm_factor);
+% Use RMS normalization instead of max to maintain proper NMSE scale
+% RMS ensures normalized signal has unit power (mean of squares = 1)
+norm_factor = sqrt(mean(abs(H_all(:)).^2));
+fprintf('Data RMS: %.2e. Normalizing...\n', norm_factor);
 H_all = H_all / norm_factor;
 X_all = X_all / norm_factor;
+
+% Verify normalization (signal power should be ~1.0)
+signal_power = mean(abs(H_all(:)).^2);
+fprintf('Normalized signal power: %.4f (should be ~1.0)\n', signal_power);
+
+% Define acceptable range for normalized power (accounts for both real and imag channels)
+EXPECTED_POWER = 1.0;
+POWER_TOLERANCE = 0.5;  % Allow ±50% deviation to account for finite sample effects
+if signal_power < EXPECTED_POWER - POWER_TOLERANCE || signal_power > EXPECTED_POWER + POWER_TOLERANCE
+    warning('Unexpected signal power %.4f after normalization (expected ~%.1f). Check data.', ...
+            signal_power, EXPECTED_POWER);
+end
 
 % --- VALIDATION SPLIT (80/20) ---
 num_total = size(H_all, 4);
@@ -164,6 +178,9 @@ xlabel('Iteration'); ylabel('MSE Loss (dB)'); title('Model Convergence (MSE)');
 legend('Location','northeast'); grid on;
 
 % Subplot 2: NMSE (The real metric)
+% Expected NMSE with RMS normalization:
+%   Initial (random): ~0-3 dB
+%   Good recovery: -10 to -20 dB depending on SNR
 subplot(2,1,2, 'Parent', tab1);
 lineNMSETrain = animatedline('Color', '#77AC30', 'LineWidth', 1.5, 'DisplayName', 'Train NMSE');
 lineNMSEVal   = animatedline('Color', '#7E2F8E', 'LineWidth', 2.0, 'Marker', 's', 'MarkerFaceColor', 'w', 'DisplayName', 'Val NMSE');
@@ -226,7 +243,7 @@ for epoch = 1:epochs
     end
     
     % --- VALIDATION PASS (End of Epoch) ---
-    fprintf('Validating Epoch %d... ', epoch);
+    fprintf('Epoch %d/%d: ', epoch, epochs);
     [val_mse_db, val_nmse_db] = evaluate_validation(learnables, lamp_layers, X_val, Y_val, batch_size, Nr, d, fc, num_sc, use_gpu);
     
     % Plot Validation Points (aligned to Iteration count for MSE, Epoch for NMSE)
@@ -234,7 +251,7 @@ for epoch = 1:epochs
     addpoints(lineNMSEVal, epoch + 1, val_nmse_db);
     drawnow;
     
-    fprintf('Val NMSE: %.2f dB | Train Loss: %.2f dB\n', val_nmse_db, loss_db);
+    fprintf('Val NMSE: %.2f dB | Val MSE: %.2f dB\n', val_nmse_db, val_mse_db);
 end
 
 train_time = toc(total_train_start);
@@ -244,7 +261,20 @@ model_dir = 'training outputs';
 model_figure = 'training_figure.fig';
 save(fullfile(model_dir,model_name), 'lamp_layers', 'grid_params', 'train_time', 'norm_factor');
 savefig(f,fullfile(model_dir,model_figure));
-fprintf('Training Complete. Model & Training Figure Saved.\n');
+
+fprintf('\n==============================================\n');
+fprintf('Training Complete in %.1f minutes\n', train_time/60);
+fprintf('Final Validation NMSE: %.2f dB\n', val_nmse_db);
+fprintf('==============================================\n');
+fprintf('Expected NMSE range: -20 to +3 dB\n');
+fprintf('  < -15 dB: Excellent recovery\n');
+fprintf('  -10 to -15 dB: Good recovery\n');
+fprintf('  -5 to -10 dB: Moderate recovery\n');
+fprintf('  > 0 dB: Poor recovery (needs investigation)\n');
+fprintf('==============================================\n');
+fprintf('Model saved: %s\n', fullfile(model_dir,model_name));
+fprintf('Figure saved: %s\n', fullfile(model_dir,model_figure));
+fprintf('==============================================\n');
 
 
 %% --- Helper Functions ---

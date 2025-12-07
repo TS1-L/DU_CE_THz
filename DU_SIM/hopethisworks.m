@@ -97,8 +97,10 @@ H_all = cat(4, Y_list{:});
 X_all = cat(4, X_list{:});
 
 % --- NORMALIZE ---
-norm_factor = max(abs(H_all), [], 'all');
-fprintf('Data Max: %.2e. Normalizing...\n', norm_factor);
+% Use RMS normalization instead of max to maintain proper NMSE scale
+% RMS ensures normalized signal has unit power (mean of squares = 1)
+norm_factor = sqrt(mean(abs(H_all(:)).^2));
+fprintf('Data RMS: %.2e. Normalizing...\n', norm_factor);
 H_all = H_all / norm_factor;
 X_all = X_all / norm_factor;
 
@@ -164,6 +166,9 @@ xlabel('Iteration'); ylabel('MSE Loss (dB)'); title('Model Convergence (MSE)');
 legend('Location','northeast'); grid on;
 
 % Subplot 2: NMSE (The real metric)
+% Expected NMSE with RMS normalization:
+%   Initial (random): ~0-3 dB
+%   Good recovery: -10 to -20 dB depending on SNR
 subplot(2,1,2, 'Parent', tab1);
 lineNMSETrain = animatedline('Color', '#77AC30', 'LineWidth', 1.5, 'DisplayName', 'Train NMSE');
 lineNMSEVal   = animatedline('Color', '#7E2F8E', 'LineWidth', 2.0, 'Marker', 's', 'MarkerFaceColor', 'w', 'DisplayName', 'Val NMSE');

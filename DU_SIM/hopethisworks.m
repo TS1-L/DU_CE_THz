@@ -104,6 +104,13 @@ fprintf('Data RMS: %.2e. Normalizing...\n', norm_factor);
 H_all = H_all / norm_factor;
 X_all = X_all / norm_factor;
 
+% Verify normalization (signal power should be ~1.0)
+signal_power = mean(H_all(:).^2);
+fprintf('Normalized signal power: %.4f (should be ~1.0)\n', signal_power);
+if signal_power < 0.5 || signal_power > 2.0
+    warning('Unexpected signal power after normalization. Check data.');
+end
+
 % --- VALIDATION SPLIT (80/20) ---
 num_total = size(H_all, 4);
 val_split = 0.2;
@@ -231,7 +238,7 @@ for epoch = 1:epochs
     end
     
     % --- VALIDATION PASS (End of Epoch) ---
-    fprintf('Validating Epoch %d... ', epoch);
+    fprintf('Epoch %d/%d: ', epoch, epochs);
     [val_mse_db, val_nmse_db] = evaluate_validation(learnables, lamp_layers, X_val, Y_val, batch_size, Nr, d, fc, num_sc, use_gpu);
     
     % Plot Validation Points (aligned to Iteration count for MSE, Epoch for NMSE)
@@ -239,7 +246,12 @@ for epoch = 1:epochs
     addpoints(lineNMSEVal, epoch + 1, val_nmse_db);
     drawnow;
     
-    fprintf('Val NMSE: %.2f dB | Train Loss: %.2f dB\n', val_nmse_db, loss_db);
+    fprintf('Val NMSE: %.2f dB | Val MSE: %.2f dB', val_nmse_db, val_mse_db);
+    if epoch == 1
+        fprintf(' (Expect ~0-3 dB initially with RMS normalization)\n');
+    else
+        fprintf('\n');
+    end
 end
 
 train_time = toc(total_train_start);
@@ -249,7 +261,20 @@ model_dir = 'training outputs';
 model_figure = 'training_figure.fig';
 save(fullfile(model_dir,model_name), 'lamp_layers', 'grid_params', 'train_time', 'norm_factor');
 savefig(f,fullfile(model_dir,model_figure));
-fprintf('Training Complete. Model & Training Figure Saved.\n');
+
+fprintf('\n==============================================\n');
+fprintf('Training Complete in %.1f minutes\n', train_time/60);
+fprintf('Final Validation NMSE: %.2f dB\n', val_nmse_db);
+fprintf('==============================================\n');
+fprintf('Expected NMSE range: -20 to +3 dB\n');
+fprintf('  < -15 dB: Excellent recovery\n');
+fprintf('  -10 to -15 dB: Good recovery\n');
+fprintf('  -5 to -10 dB: Moderate recovery\n');
+fprintf('  > 0 dB: Poor recovery (needs investigation)\n');
+fprintf('==============================================\n');
+fprintf('Model saved: %s\n', fullfile(model_dir,model_name));
+fprintf('Figure saved: %s\n', fullfile(model_dir,model_figure));
+fprintf('==============================================\n');
 
 
 %% --- Helper Functions ---
